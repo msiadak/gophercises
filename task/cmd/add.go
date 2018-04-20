@@ -29,7 +29,7 @@ var addCmd = &cobra.Command{
 		err = db.Update(func(tx *bolt.Tx) error {
 			b, err := tx.CreateBucketIfNotExists([]byte("Tasks"))
 			if err != nil {
-				return fmt.Errorf("create bucket: %s\n", err)
+				return fmt.Errorf("create bucket: %s", err)
 			}
 
 			id, _ := b.NextSequence()
