@@ -3,13 +3,11 @@ package sitemap
 import (
 	"encoding/xml"
 	"fmt"
-	"gophercises/link"
 	"net/http"
 	"net/url"
-)
 
-type URLSet struct {
-}
+	"github.com/msiadak/gophercises/link"
+)
 
 type URL struct {
 	XMLName xml.Name `xml:"url"`
