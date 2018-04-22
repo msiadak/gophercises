@@ -3,10 +3,11 @@ package cmd
 import (
 	"encoding/binary"
 	"fmt"
-	"os"
+	"log"
 	"strings"
 
 	"github.com/boltdb/bolt"
+	"github.com/msiadak/gophercises/task/util"
 	"github.com/spf13/cobra"
 )
 
@@ -20,11 +21,16 @@ var addCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		task := []byte(strings.Join(args, " "))
 
-		db, err := bolt.Open("tasks.db", 0600, nil)
+		dbPath, err := util.DefaultDBPath()
 		if err != nil {
-			fmt.Printf("Couldn't open db: '%s'\n%s\n", "tasks.db", err)
-			os.Exit(1)
+			log.Fatalf("couldn't determine path to DB file\n%s\n", err)
 		}
+
+		db, err := bolt.Open(dbPath, 0600, nil)
+		if err != nil {
+			log.Fatalf("couldn't open db: '%s'\n%s\n", dbPath, err)
+		}
+		defer db.Close()
 
 		err = db.Update(func(tx *bolt.Tx) error {
 			b, err := tx.CreateBucketIfNotExists([]byte("Tasks"))
@@ -37,8 +43,7 @@ var addCmd = &cobra.Command{
 			return b.Put(itob(int(id)), task)
 		})
 		if err != nil {
-			fmt.Printf("Couldn't add task: %s\n%s\n", task, err)
-			os.Exit(1)
+			log.Fatalf("couldn't add task: %s\n%s\n", task, err)
 		}
 
 		fmt.Printf("Added '%s' to tasks\n", task)
