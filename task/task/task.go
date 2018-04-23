@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-
 	"github.com/mitchellh/go-homedir"
 )
 
