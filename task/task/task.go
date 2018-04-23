@@ -40,14 +40,15 @@ func openDB(dbPath string) error {
 	return nil
 }
 
+// CloseDB closes the database.
 func CloseDB() {
 	db.Close()
 }
 
 // InitDB opens the database and creates the tasks bucket if it doesn't
 // already exist.
-func InitDB(dbPath string) error {
-	err := openDB(dbPath)
+func InitDB() error {
+	err := openDB(defaultDBPath())
 	if err != nil {
 		return err
 	}
@@ -66,30 +67,34 @@ func InitDB(dbPath string) error {
 	return nil
 }
 
-type jsonTime time.Time
-
-func (jt jsonTime) MarshalJSON() ([]byte, error) {
-	stamp := fmt.Sprintf("\"%s\"", time.Time(jt).Format(time.RFC3339))
-	return []byte(stamp), nil
-}
-
-func (jt *jsonTime) UnmarshalJSON(v []byte) error {
-	t, err := time.Parse(time.RFC3339, string(v))
-	if err != nil {
-		return err
-	}
-
-	*jt = jsonTime(t)
-	return nil
-}
-
 // Task represents something that needs doing and the time it was entered
 // into the system and completed.
 type Task struct {
-	ID      int
+	ID      uint64
 	Name    string
-	Created jsonTime
-	Done    jsonTime
+	Created time.Time
+	Done    time.Time
+}
+
+func (t *Task) idAsBytes() []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, t.ID)
+	return b
+}
+
+// Do marks a task as done in the database.
+func (t *Task) Do() error {
+	return db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(taskBucket))
+		t.Done = time.Now()
+
+		rec, err := json.Marshal(t)
+		if err != nil {
+			return err
+		}
+
+		return b.Put(t.idAsBytes(), rec)
+	})
 }
 
 type taskPredicate func(t *Task) bool
@@ -117,36 +122,41 @@ func list(fn taskPredicate) ([]Task, error) {
 		return nil
 	})
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
-
 	return tasks, nil
 }
 
-func Create(name string) *Task {
-	t := Task{Name: name, Created: jsonTime(time.Now())}
+// Add returns a new Task instance and saves it to the database.
+func Add(name string) error {
+	t := Task{Name: name, Created: time.Now()}
 
 	err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(taskBucket))
 
 		id, _ := b.NextSequence()
+		t.ID = id
 
 		buf, err := json.Marshal(&t)
 		if err != nil {
 			return err
 		}
 
-		return b.Put(itob(int(id)), buf)
+		return b.Put(t.idAsBytes(), buf)
 	})
+	if err != nil {
+		return err
+	}
 
-	return t
+	return nil
 }
 
 // ListIncomplete returns a slice of the tasks that are incomplete (e.g. tasks
 // that do not have a Done time)
 func ListIncomplete() ([]Task, error) {
 	tasks, err := list(func(t *Task) bool {
-		return time.Time(t.Done).IsZero()
+		return t.Done.IsZero()
 	})
 	if err != nil {
 		return nil, err
@@ -155,25 +165,16 @@ func ListIncomplete() ([]Task, error) {
 	return tasks, nil
 }
 
-// ListCompleted returns a slice of the tasks that have been completed (e.g.
-// tasks that have a Done time)
-func ListCompleted() ([]Task, error) {
+// ListCompletedToday returns a slice of the tasks that have been completed
+// today.
+func ListCompletedToday() ([]Task, error) {
 	tasks, err := list(func(t *Task) bool {
-		return !time.Time(t.Done).IsZero()
+		f := "2006 Jan _2"
+		return t.Done.Format(f) == time.Now().Format(f)
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return tasks, nil
-}
-
-func itob(v int) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(v))
-	return b
-}
-
-func MarkDone(taskNum uint) error {
-
 }

@@ -4,12 +4,19 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/msiadak/gophercises/task/task"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "task",
 	Short: "Task is a CLI task manager",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		task.InitDB()
+	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		task.CloseDB()
+	},
 }
 
 func Execute() {
