@@ -13,7 +13,8 @@ func init() {
 }
 
 var rmCmd = &cobra.Command{
-	Use: "rm",
+	Use:   "rm",
+	Short: "Delete a task from the database",
 	Run: func(cmd *cobra.Command, args []string) {
 		taskNum, err := strconv.Atoi(args[0])
 		if err != nil {
