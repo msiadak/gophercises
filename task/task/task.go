@@ -97,6 +97,14 @@ func (t *Task) Do() error {
 	})
 }
 
+// Rm removes a task from the database.
+func (t *Task) Rm() error {
+	return db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(taskBucket))
+		return b.Delete(t.idAsBytes())
+	})
+}
+
 type taskPredicate func(t *Task) bool
 
 // list returns a slice of tasks that satisfy the given predicate function
