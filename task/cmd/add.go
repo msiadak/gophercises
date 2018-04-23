@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/binary"
+	"fmt"
 	"log"
 	"strings"
 
@@ -17,10 +18,13 @@ var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add a task to the list",
 	Run: func(cmd *cobra.Command, args []string) {
-		err := task.Add(strings.Join(args, " "))
+		name := strings.Join(args, " ")
+		err := task.Add(name)
 		if err != nil {
 			log.Fatalf("Couldn't add task: %s\n", err)
 		}
+
+		fmt.Printf("Added task '%s'\n", name)
 	},
 }
 

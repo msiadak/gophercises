@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 
@@ -27,8 +28,14 @@ var doCmd = &cobra.Command{
 		}
 
 		for i, t := range tasks {
-			if i == d {
-				t.Do()
+			if i+1 == d {
+				err := t.Do()
+				if err != nil {
+					log.Fatalf("Couldn't mark task %d done: %s\n", d, err)
+				}
+
+				fmt.Printf("Marked '%d. %s' done\n", d, t.Name)
+				break
 			}
 		}
 	},
