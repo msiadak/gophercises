@@ -1,10 +1,13 @@
 package deck
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 // Possible suits in a standard 52-card deck.
 const (
-	Spades Suit = iota
+	Spades Suit = iota + 1
 	Diamonds
 	Clubs
 	Hearts
@@ -30,13 +33,21 @@ const (
 // Suit represents a card's suit.
 type Suit int
 
+//go:generate stringer -type=Suit
+
 // Rank represents a card's numeric or face value.
 type Rank int
+
+//go:generate stringer -type=Rank
 
 // Card represents a playing card in a standard 52-card deck.
 type Card struct {
 	Suit
 	Rank
+}
+
+func (c Card) String() string {
+	return fmt.Sprintf("%s of %s", c.Rank, c.Suit)
 }
 
 // New returns a new deck (slice of cards).
@@ -45,9 +56,9 @@ type Card struct {
 // come in the package (in ascending value by suit, then by rank as shown
 // in the order of the Suit and Rank constants above).
 func New(options ...func([]Card)) []Card {
-	cards := make([]Card, 52)
+	cards := make([]Card, 0, 52)
 
-	for i := 0; i < 4; i++ {
+	for i := 1; i <= 4; i++ {
 		for j := 1; j <= 13; j++ {
 			cards = append(cards, Card{Suit(i), Rank(j)})
 		}
@@ -88,3 +99,6 @@ func SortBy(by func(c1, c2 *Card) bool) func([]Card) {
 	}
 }
 
+func DefaultCardSorter() cardSorter {
+	return cardSorter{}
+}
