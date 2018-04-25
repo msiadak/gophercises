@@ -46,7 +46,7 @@ func seedDB(db *gorm.DB) error {
 	return nil
 }
 
-func normalizePhoneNumber(pn string) string {
+func normalize(pn string) string {
 	var buf bytes.Buffer
 
 	for _, r := range pn {
@@ -77,7 +77,7 @@ func main() {
 	db.Find(&phoneNumbers)
 
 	for _, rec := range phoneNumbers {
-		rec.PhoneNumber = normalizePhoneNumber(rec.PhoneNumber)
+		rec.PhoneNumber = normalize(rec.PhoneNumber)
 		db.Save(&rec)
 
 		var count uint
