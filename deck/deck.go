@@ -159,3 +159,15 @@ func Filter(filterCards []Card) func([]Card) []Card {
 		return filtered
 	}
 }
+
+// Multiply returns a closure that creates copies of the input cards
+// and returns them concatenated together into a flat slice.
+func Multiply(n uint) func([]Card) []Card {
+	return func(cards []Card) []Card {
+		multiplied := make([]Card, 0, len(cards)*int(n))
+		for i := uint(0); i < n; i++ {
+			multiplied = append(multiplied, cards...)
+		}
+		return multiplied
+	}
+}

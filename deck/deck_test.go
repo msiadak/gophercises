@@ -95,4 +95,14 @@ func TestNew(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("Multiply", func(t *testing.T) {
+		cards := New(Multiply(3))
+		got := len(cards)
+		want := 156
+
+		if want != got {
+			t.Errorf("Wanted %d cards, got %d", want, got)
+		}
+	})
 }
