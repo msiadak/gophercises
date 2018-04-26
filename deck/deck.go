@@ -2,6 +2,7 @@ package deck
 
 import (
 	"fmt"
+	"math/rand"
 	"sort"
 )
 
@@ -55,7 +56,7 @@ func (c Card) String() string {
 // By default, the deck is returned in the order that a new deck of cards will
 // come in the package (in ascending value by suit, then by rank as shown
 // in the order of the Suit and Rank constants above).
-func New(options ...func([]Card)) []Card {
+func New(options ...option) []Card {
 	cards := make([]Card, 0, 52)
 
 	for i := 1; i <= 4; i++ {
@@ -70,6 +71,8 @@ func New(options ...func([]Card)) []Card {
 
 	return cards
 }
+
+type option func([]Card)
 
 type cardSorter struct {
 	cards []Card
@@ -99,6 +102,14 @@ func SortBy(by func(c1, c2 *Card) bool) func([]Card) {
 	}
 }
 
-func DefaultCardSorter() cardSorter {
-	return cardSorter{}
+func SortReverse() func([]Card) {
+	return SortBy(func(c1, c2 *Card) bool {
+		return c1.Suit > c2.Suit || (c1.Suit == c2.Suit && c1.Rank > c2.Rank)
+	})
+}
+
+func Shuffle(cards []Card) {
+	rand.Shuffle(len(cards), func(i, j int) {
+		cards[i], cards[j] = cards[j], cards[i]
+	})
 }
