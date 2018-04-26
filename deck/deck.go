@@ -29,6 +29,7 @@ const (
 	Jack
 	Queen
 	King
+	Joker Rank = -1
 )
 
 // Suit represents a card's suit.
@@ -48,7 +49,12 @@ type Card struct {
 }
 
 func (c Card) String() string {
-	return fmt.Sprintf("%s of %s", c.Rank, c.Suit)
+	var suffix string
+	if c.Suit > 0 {
+		suffix = fmt.Sprintf(" of %s", c.Suit)
+	}
+
+	return fmt.Sprintf("%s%s", c.Rank, suffix)
 }
 
 // New returns a new deck (slice of cards).
@@ -66,13 +72,13 @@ func New(options ...option) []Card {
 	}
 
 	for _, option := range options {
-		option(cards)
+		cards = option(cards)
 	}
 
 	return cards
 }
 
-type option func([]Card)
+type option func([]Card) []Card
 
 type cardSorter struct {
 	cards []Card
@@ -96,20 +102,60 @@ func (s *cardSorter) Less(i, j int) bool {
 //
 // The returned closure will sort the deck of cards based on the provided "by"
 // function and can be passed to New() as an option to sort the new deck.
-func SortBy(by func(c1, c2 *Card) bool) func([]Card) {
-	return func(cards []Card) {
-		sort.Sort(&cardSorter{cards, by})
+func SortBy(by func(c1, c2 *Card) bool) func([]Card) []Card {
+	return func(cards []Card) []Card {
+		sorted := make([]Card, len(cards))
+		copy(sorted, cards)
+		sort.Sort(&cardSorter{sorted, by})
+		return sorted
 	}
 }
 
-func SortReverse() func([]Card) {
+// SortReverse returns a function that sorts a slice of cards in descending
+// order of Suit, then Rank.
+func SortReverse() func([]Card) []Card {
 	return SortBy(func(c1, c2 *Card) bool {
 		return c1.Suit > c2.Suit || (c1.Suit == c2.Suit && c1.Rank > c2.Rank)
 	})
 }
 
-func Shuffle(cards []Card) {
-	rand.Shuffle(len(cards), func(i, j int) {
-		cards[i], cards[j] = cards[j], cards[i]
+// Shuffle randomizes the order of a slice of cards.
+func Shuffle(cards []Card) []Card {
+	shuffled := make([]Card, len(cards))
+	copy(shuffled, cards)
+	rand.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 	})
+	return shuffled
+}
+
+// Jokers returns a function that adds n jokers to a slice of cards.
+func Jokers(n uint) func([]Card) []Card {
+	return func(cards []Card) []Card {
+		newCards := make([]Card, len(cards), len(cards)+int(n))
+		copy(newCards, cards)
+		for i := uint(0); i < n; i++ {
+			newCards = append(newCards, Card{Rank: Joker})
+		}
+		return newCards
+	}
+}
+
+// Filter returns a closure that filters cards from a card slice.
+func Filter(filterCards []Card) func([]Card) []Card {
+	return func(cards []Card) []Card {
+		filtered := make([]Card, 0)
+		for _, c := range cards {
+			for _, f := range filterCards {
+				switch {
+				case c.Suit == f.Suit && f.Rank == 0:
+				case c.Rank == f.Rank && f.Suit == 0:
+				case c.Suit == f.Suit && c.Rank == f.Rank:
+				default:
+					filtered = append(filtered, c)
+				}
+			}
+		}
+		return filtered
+	}
 }

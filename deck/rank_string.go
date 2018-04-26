@@ -4,14 +4,23 @@ package deck
 
 import "strconv"
 
-const _Rank_name = "AceTwoThreeFourFiveSixSevenEightNineTenJackQueenKing"
+const (
+	_Rank_name_0 = "Joker"
+	_Rank_name_1 = "AceTwoThreeFourFiveSixSevenEightNineTenJackQueenKing"
+)
 
-var _Rank_index = [...]uint8{0, 3, 6, 11, 15, 19, 22, 27, 32, 36, 39, 43, 48, 52}
+var (
+	_Rank_index_1 = [...]uint8{0, 3, 6, 11, 15, 19, 22, 27, 32, 36, 39, 43, 48, 52}
+)
 
 func (i Rank) String() string {
-	i -= 1
-	if i < 0 || i >= Rank(len(_Rank_index)-1) {
-		return "Rank(" + strconv.FormatInt(int64(i+1), 10) + ")"
+	switch {
+	case i == -1:
+		return _Rank_name_0
+	case 1 <= i && i <= 13:
+		i -= 1
+		return _Rank_name_1[_Rank_index_1[i]:_Rank_index_1[i+1]]
+	default:
+		return "Rank(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _Rank_name[_Rank_index[i]:_Rank_index[i+1]]
 }
