@@ -131,7 +131,7 @@ func main() {
 	}
 
 	fmt.Printf("Dealer's Hand: %s\n", dealerHand)
-	for dealerHand.Value().value < 16 ||
+	for dealerHand.Value().value <= 16 ||
 		(dealerHand.Value().value == 17 && dealerHand.Value().soft) {
 		dealerHand.Draw(&gameDeck, 1)
 		fmt.Printf("Dealer hits: %s\n", dealerHand.LastCard())
