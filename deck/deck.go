@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+
+	"github.com/fatih/color"
 )
 
 // Possible suits in a standard 52-card deck.
@@ -49,12 +51,20 @@ type Card struct {
 }
 
 func (c Card) String() string {
-	var suffix string
-	if c.Suit > 0 {
-		suffix = fmt.Sprintf(" of %s", c.Suit)
+	switch {
+	case c.Rank == Joker:
+		return "Jo"
+	case c.Suit >= Spades && c.Suit <= Hearts && c.Rank >= Ace && c.Rank <= King:
+		ranks := []rune("A23456789TJQK")
+		suits := []rune("♠♦♣♥")
+		out := fmt.Sprintf
+		if c.Suit%2 == 0 {
+			out = color.New(color.FgRed).SprintfFunc()
+		}
+		return out("%s%s", string(ranks[c.Rank-1]), string(suits[c.Suit-1]))
+	default:
+		return fmt.Sprintf("Card{%d %d}", c.Suit, c.Rank)
 	}
-
-	return fmt.Sprintf("%s%s", c.Rank, suffix)
 }
 
 // New returns a new deck (slice of cards).

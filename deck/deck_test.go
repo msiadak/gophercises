@@ -1,6 +1,7 @@
 package deck
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -105,4 +106,18 @@ func TestNew(t *testing.T) {
 			t.Errorf("Wanted %d cards, got %d", want, got)
 		}
 	})
+}
+
+func TestCard(t *testing.T) {
+	cards := []Card{
+		Card{Spades, Ace},
+		Card{Diamonds, King},
+		Card{Clubs, Queen},
+		Card{Hearts, Jack},
+		Card{Rank: Joker},
+	}
+	for _, card := range cards {
+		fmt.Println(card)
+	}
+
 }
