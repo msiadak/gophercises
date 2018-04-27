@@ -37,9 +37,9 @@ func (mux *RecoverMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			logger.Printf("Panicked while handling %s\n", r.URL)
 			logger.Println(rec)
-			logger.Println(spew.Sdump(r))
-			logger.Println("Stack trace:")
-			logger.Println(string(debug.Stack()))
+			logger.Print(spew.Sdump(r))
+			logger.Println("Stack Trace:")
+			logger.Print(string(debug.Stack()))
 			rrw.Flush()
 		}
 	}()
