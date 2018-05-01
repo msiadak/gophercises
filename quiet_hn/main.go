@@ -33,6 +33,7 @@ func main() {
 func handler(numStories int, tpl *template.Template, workers int) http.HandlerFunc {
 	totalStories := numStories + workers
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("In handler")
 		start := time.Now()
 		var client hn.Client
 		ids, err := client.TopItems()
@@ -50,7 +51,7 @@ func handler(numStories int, tpl *template.Template, workers int) http.HandlerFu
 			close(idCh)
 		}()
 
-		storiesCh := make(chan item)
+		storiesCh := make(chan item, workers)
 		stories := make([]item, totalStories)
 		done := make(chan struct{})
 
@@ -70,44 +71,33 @@ func handler(numStories int, tpl *template.Template, workers int) http.HandlerFu
 				for {
 					select {
 					case <-done:
-						fmt.Printf("shutting down worker %d\n", n)
 						return
-					default:
-					}
+					case id := <-idCh:
+						hnItem, err := client.GetItem(id)
+						if err != nil {
+							return
+						}
 
-					id, more := <-idCh
-					if !more {
-						fmt.Printf("no more ids\n")
-						return
-					}
-
-					hnItem, err := client.GetItem(id)
-					if err != nil {
-						return
-					}
-
-					item := parseHNItem(hnItem)
-					if isStoryLink(item) {
-						storiesCh <- item
+						item := parseHNItem(hnItem)
+						if isStoryLink(item) {
+							storiesCh <- item
+						}
 					}
 				}
 			}(i)
 		}
 
-		go func() {
-			<-done
-			fmt.Println("executing template?")
-			data := templateData{
-				Stories: stories[:numStories],
-				Time:    time.Now().Sub(start),
-			}
-			err = tpl.Execute(w, data)
-			if err != nil {
-				http.Error(w, "Failed to process the template", http.StatusInternalServerError)
-				fmt.Println("Failed to process the template")
-				return
-			}
-		}()
+		<-done
+		fmt.Println("executing template?")
+		data := templateData{
+			Stories: stories[:numStories],
+			Time:    time.Now().Sub(start),
+		}
+		err = tpl.Execute(w, data)
+		if err != nil {
+			http.Error(w, "Failed to process the template", http.StatusInternalServerError)
+			return
+		}
 	})
 }
 
@@ -148,5 +138,6 @@ func (is *itemSorter) Swap(i, j int) {
 }
 
 func (is *itemSorter) Less(i, j int) bool {
+	fmt.Printf("is.items[%d].ID is > is.items[%d].ID\n")
 	return is.items[i].ID > is.items[j].ID
 }
