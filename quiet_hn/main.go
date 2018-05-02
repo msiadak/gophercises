@@ -59,7 +59,7 @@ func handler(numStories int, tpl *template.Template, workers int) http.HandlerFu
 			for i := 0; i < totalStories; i++ {
 				stories[i] = <-storiesCh
 			}
-			sort.Sort(&itemSorter{stories})
+			sort.Sort(byDescID(stories))
 			for i := 0; i < workers+1; i++ {
 				done <- struct{}{}
 			}
@@ -125,19 +125,16 @@ type templateData struct {
 	Time    time.Duration
 }
 
-type itemSorter struct {
-	items []item
+type byDescID []item
+
+func (items byDescID) Len() int {
+	return len(items)
 }
 
-func (is *itemSorter) Len() int {
-	return len(is.items)
+func (items byDescID) Swap(i, j int) {
+	items[i], items[j] = items[j], items[i]
 }
 
-func (is *itemSorter) Swap(i, j int) {
-	is.items[i], is.items[j] = is.items[j], is.items[i]
-}
-
-func (is *itemSorter) Less(i, j int) bool {
-	fmt.Printf("is.items[%d].ID is > is.items[%d].ID\n")
-	return is.items[i].ID > is.items[j].ID
+func (items byDescID) Less(i, j int) bool {
+	return items[i].ID > items[j].ID
 }
