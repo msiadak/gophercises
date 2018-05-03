@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"sort"
 	"sync"
 	"time"
 
@@ -30,19 +29,19 @@ func newCache(client hn.Client, workers, stories int) *cache {
 }
 
 func (c *cache) Update() error {
+	log.Println("Starting cache update")
 	ids, err := c.client.TopItems()
 	if err != nil {
 		return fmt.Errorf("Failed to load top stories: %s", err)
 	}
 
-	storyCh, done := storyFetcherPool(c.client, ids, c.workers)
-	stories := retrieveStories(c.stories, storyCh, done)
+	stories := fetchStories(c.client, ids, c.workers, c.stories)
 	c.mutex.Lock()
 	c.items = stories
-	sort.Sort(byIDSlice{ids, c.items})
 	c.lastUpdated = time.Now()
 	c.mutex.Unlock()
 
+	log.Println("Finished cache update")
 	return nil
 }
 

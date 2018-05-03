@@ -14,54 +14,67 @@ type item struct {
 	Host string
 }
 
-func storyFetcherPool(client hn.Client, ids []int, numWorkers int) (<-chan item, chan<- struct{}) {
-	idCh := make(chan int)
-	storyCh := make(chan item)
+type fetchItemJob struct {
+	ID         int
+	ResponseCh chan item
+}
+
+func fetchStories(client hn.Client, ids []int, numWorkers, numStories int) []item {
+	jobs := make(chan fetchItemJob, numWorkers)
+	responses := make(chan chan item, numWorkers)
 	done := make(chan struct{})
+	defer close(done)
+	defer close(jobs)
+	defer close(responses)
 
-	go func() {
-		for _, id := range ids {
-			select {
-			case <-done:
-				close(idCh)
-				return
-			case idCh <- id:
-			}
-		}
-		close(idCh)
-	}()
-
+	// Spawn workers to handle fetch jobs
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for {
-				id, more := <-idCh
-				if more {
-					hnItem, err := client.GetItem(id)
+				select {
+				case <-done:
+					return
+				case job := <-jobs:
+					hnItem, err := client.GetItem(job.ID)
 					if err != nil {
-						log.Printf("Couldn't get item %d: %s\n", id, err)
+						log.Printf("Couldn't get item %d: %s\n", job.ID, err)
 						continue
 					}
 					item := parseHNItem(hnItem)
-					if isStoryLink(item) {
-						storyCh <- item
-					}
-				} else {
-					return
+					job.ResponseCh <- item
 				}
 			}
 		}()
 	}
 
-	return storyCh, done
-}
+	// Feed the jobs to the jobs chan and pass on the response chans
+	go func() {
+		for _, id := range ids {
+			select {
+			case <-done:
+				return
+			default:
+				job := fetchItemJob{id, make(chan item)}
+				responses <- job.ResponseCh
+				jobs <- job
+			}
+		}
+	}()
 
-func retrieveStories(n int, storyCh <-chan item, done chan<- struct{}) []item {
-	stories := make([]item, n)
-	for i := 0; i < n; i++ {
-		stories[i] = <-storyCh
+	// Receive the stories and store them in a slice
+	stories := make([]item, numStories)
+	for i := 0; i < numStories; i++ {
+		for {
+			responseCh := <-responses
+			item := <-responseCh
+			close(responseCh)
+			if isStoryLink(item) {
+				stories[i] = item
+				break
+			}
+		}
 	}
-	done <- struct{}{}
-	close(done)
+
 	return stories
 }
 
@@ -76,30 +89,4 @@ func parseHNItem(hnItem hn.Item) item {
 		ret.Host = strings.TrimPrefix(url.Hostname(), "www.")
 	}
 	return ret
-}
-
-type byIDSlice struct {
-	ids   []int
-	items []item
-}
-
-func (s byIDSlice) Len() int {
-	return len(s.items)
-}
-
-func (s byIDSlice) Swap(i, j int) {
-	s.items[i], s.items[j] = s.items[j], s.items[i]
-}
-
-func (s byIDSlice) Less(i, j int) bool {
-	return s.findIDIndex(s.items[i].ID) < s.findIDIndex(s.items[j].ID)
-}
-
-func (s byIDSlice) findIDIndex(id int) int {
-	for i, v := range s.ids {
-		if v == id {
-			return i
-		}
-	}
-	return -1
 }

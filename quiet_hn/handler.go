@@ -16,7 +16,7 @@ func handler(c *cache, tpl *template.Template) http.HandlerFunc {
 		start := time.Now()
 
 		data := templateData{
-			Stories: c.Get()[:30],
+			Stories: c.Get(),
 			Time:    time.Now().Sub(start),
 		}
 		err := tpl.Execute(w, data)
