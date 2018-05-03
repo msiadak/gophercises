@@ -7,8 +7,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/msiadak/gophercises/quiet_hn/hn"
@@ -22,9 +22,13 @@ func main() {
 	flag.IntVar(&workers, "workers", 8, "number of workers to fetch items with")
 	flag.Parse()
 
+	c := newCache(hn.Client{}, workers, numStories)
+	c.Update()
+	c.UpdateEvery(time.Minute * 10)
+
 	tpl := template.Must(template.ParseFiles("./index.gohtml"))
 
-	http.HandleFunc("/", handler(numStories, workers, tpl))
+	http.HandleFunc("/", handler(c, tpl))
 
 	// Start the server
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
@@ -81,26 +85,15 @@ func retrieveStories(n int, storyCh <-chan item, done chan<- struct{}) []item {
 	return stories
 }
 
-func handler(numStories int, numWorkers int, tpl *template.Template) http.HandlerFunc {
+func handler(c *cache, tpl *template.Template) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		var client hn.Client
-
-		ids, err := client.TopItems()
-		if err != nil {
-			http.Error(w, "Failed to load top stories", http.StatusInternalServerError)
-			return
-		}
-
-		storyCh, done := storyFetcherPool(client, ids, numWorkers)
-		stories := retrieveStories(numStories+(numStories/5), storyCh, done)
-		sort.Sort(byDescID(stories))
 
 		data := templateData{
-			Stories: stories[:numStories],
+			Stories: c.Get()[:30],
 			Time:    time.Now().Sub(start),
 		}
-		err = tpl.Execute(w, data)
+		err := tpl.Execute(w, data)
 		if err != nil {
 			http.Error(w, "Failed to process the template", http.StatusInternalServerError)
 			return
@@ -132,16 +125,91 @@ type templateData struct {
 	Time    time.Duration
 }
 
-type byDescID []item
-
-func (items byDescID) Len() int {
-	return len(items)
+type byIDSlice struct {
+	ids   []int
+	items *[]item
 }
 
-func (items byDescID) Swap(i, j int) {
-	items[i], items[j] = items[j], items[i]
+func (s byIDSlice) Len() int {
+	return len(*s.items)
 }
 
-func (items byDescID) Less(i, j int) bool {
-	return items[i].ID > items[j].ID
+func (s byIDSlice) Swap(i, j int) {
+	(*s.items)[i], (*s.items)[j] = (*s.items)[j], (*s.items)[i]
+}
+
+func (s byIDSlice) Less(i, j int) bool {
+	iIDPos, jIDPos := -1, -1
+	for k := 0; iIDPos != -1 && jIDPos != -1; k++ {
+		switch s.ids[k] {
+		case (*s.items)[i].ID:
+			iIDPos = k
+		case (*s.items)[j].ID:
+			jIDPos = k
+		}
+	}
+	return iIDPos < jIDPos
+}
+
+type cache struct {
+	client      hn.Client
+	workers     int
+	stories     int
+	lastUpdated time.Time
+	mutex       *sync.Mutex
+	items       []item
+}
+
+func newCache(client hn.Client, workers, stories int) *cache {
+	return &cache{
+		client:  client,
+		workers: workers,
+		stories: stories,
+		mutex:   &sync.Mutex{},
+		items:   make([]item, stories),
+	}
+}
+
+func (c *cache) Update() error {
+	fmt.Println("Updating")
+	ids, err := c.client.TopItems()
+	if err != nil {
+		return fmt.Errorf("Failed to load top stories: %s", err)
+	}
+
+	fmt.Println("5 ids:", ids[:5])
+
+	storyCh, done := storyFetcherPool(c.client, ids, c.workers)
+	stories := retrieveStories(c.stories, storyCh, done)
+	c.mutex.Lock()
+	c.items = stories
+	c.lastUpdated = time.Now()
+	c.mutex.Unlock()
+
+	for i := 0; i < 5; i++ {
+		fmt.Println("id:", c.items[i].ID)
+		fmt.Println("title:", c.items[i].Title)
+	}
+
+	return nil
+}
+
+func (c *cache) UpdateEvery(d time.Duration) {
+	tick := time.NewTicker(d)
+	defer tick.Stop()
+	go func() {
+		for {
+			<-tick.C
+			err := c.Update()
+			if err != nil {
+				log.Fatalln("Couldn't update cache :(")
+			}
+		}
+	}()
+}
+
+func (c *cache) Get() []item {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	return c.items
 }
