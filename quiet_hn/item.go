@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/url"
 	"strings"
@@ -19,22 +20,17 @@ type fetchItemJob struct {
 	ResponseCh chan item
 }
 
-func fetchStories(client hn.Client, ids []int, numWorkers, numStories int) []item {
+func fetchStories(client hn.Client, ids []int, numWorkers, numStories int) ([]item, error) {
 	jobs := make(chan fetchItemJob, numWorkers)
 	responses := make(chan chan item, numWorkers)
 	done := make(chan struct{})
 	defer close(done)
-	defer close(jobs)
-	defer close(responses)
 
 	// Spawn workers to handle fetch jobs
 	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for {
-				select {
-				case <-done:
-					return
-				case job := <-jobs:
+				if job, more := <-jobs; more {
 					hnItem, err := client.GetItem(job.ID)
 					if err != nil {
 						log.Printf("Couldn't get item %d: %s\n", job.ID, err)
@@ -42,6 +38,8 @@ func fetchStories(client hn.Client, ids []int, numWorkers, numStories int) []ite
 					}
 					item := parseHNItem(hnItem)
 					job.ResponseCh <- item
+				} else {
+					return
 				}
 			}
 		}()
@@ -52,6 +50,8 @@ func fetchStories(client hn.Client, ids []int, numWorkers, numStories int) []ite
 		for _, id := range ids {
 			select {
 			case <-done:
+				close(jobs)
+				close(responses)
 				return
 			default:
 				job := fetchItemJob{id, make(chan item)}
@@ -62,20 +62,23 @@ func fetchStories(client hn.Client, ids []int, numWorkers, numStories int) []ite
 	}()
 
 	// Receive the stories and store them in a slice
-	stories := make([]item, numStories)
+	stories := make([]item, 0, numStories)
 	for i := 0; i < numStories; i++ {
 		for {
-			responseCh := <-responses
+			responseCh, more := <-responses
+			if !more {
+				return stories, fmt.Errorf("Ran out of stories to fetch, only got %d", len(stories))
+			}
 			item := <-responseCh
 			close(responseCh)
 			if isStoryLink(item) {
-				stories[i] = item
+				stories = append(stories, item)
 				break
 			}
 		}
 	}
 
-	return stories
+	return stories, nil
 }
 
 func isStoryLink(item item) bool {

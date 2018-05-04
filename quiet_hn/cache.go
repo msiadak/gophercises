@@ -35,7 +35,11 @@ func (c *cache) Update() error {
 		return fmt.Errorf("Failed to load top stories: %s", err)
 	}
 
-	stories := fetchStories(c.client, ids, c.workers, c.stories)
+	stories, err := fetchStories(c.client, ids, c.workers, c.stories)
+	if err != nil {
+		return err
+	}
+
 	c.mutex.Lock()
 	c.items = stories
 	c.lastUpdated = time.Now()
