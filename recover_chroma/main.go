@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"html"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"runtime/debug"
@@ -39,7 +41,15 @@ func srcMw(app http.Handler) http.HandlerFunc {
 		}
 		path := r.URL.Path[len("/src/"):]
 
-		http.ServeFile(w, r, path)
+		buf, err := ioutil.ReadFile(path)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, fmt.Sprintf("Couldn't open file: %s\n", path), http.StatusNotFound)
+			return
+		}
+
+		text := html.EscapeString(string(buf))
+		fmt.Fprintf(w, "<h1>%s</h1><pre>%s</pre>", path, text)
 	}
 }
 
